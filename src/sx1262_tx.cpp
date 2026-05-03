@@ -108,6 +108,13 @@ void SX1262TX::seek(uint32_t progressMs) {
 
 void SX1262TX::setBrightness(uint8_t b) {
     _brightness = b > 100 ? 100 : b;
+    // Send burst so Node applies immediately (not wait for periodic frame)
+    if (_initialized) {
+        for (int i = 0; i < 3; i++) {
+            if (i > 0) delay(10);
+            _sendFrame();
+        }
+    }
 }
 
 void SX1262TX::_buildFrame(uint8_t* buf) {
@@ -148,6 +155,8 @@ void SX1262TX::_sendFrame() {
     if (state != RADIOLIB_ERR_NONE) {
         Serial.printf("[SX1262] TX error: %d\n", state);
     }
+    // Small guard: let SX1262 settle before ESP-NOW can use WiFi
+    delayMicroseconds(500);
 }
 
 uint8_t SX1262TX::_crc8maxim(const uint8_t* data, size_t len) {
