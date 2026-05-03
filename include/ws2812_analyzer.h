@@ -3,8 +3,8 @@
 //  WS2812 Analyzer — RMT RX hardware capture
 //
 //  Uses ESP-IDF 5.x RMT receive for precise pulse timing.
-//  4 RX channels → sequential capture: CH0-3 then CH4-7.
-//  100ns resolution, hardware-driven, zero CPU during capture.
+//  Sequential per-channel, multi-frame accumulation.
+//  100ns resolution, hardware-driven, FPS + timing + dropped frame detection.
 // ============================================================
 
 #include <Arduino.h>
@@ -42,8 +42,9 @@ public:
 private:
     static void _captureTask(void* param);
     void _doCapture(uint32_t durationMs);
-    bool _captureGroup(int startCh, int count, uint32_t durationMs);
-    void _decodeRmtSymbols(int ch, const rmt_symbol_word_t* symbols, size_t count);
+    bool _captureChannel(int ch, uint32_t durationMs);
+    void _processFrame(int ch, const rmt_symbol_word_t* symbols, size_t count);
+    void _buildChannelResult(int ch);
 
     volatile bool _capturing = false;
     uint32_t _captureDurationMs = 0;
