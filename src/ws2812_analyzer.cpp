@@ -249,6 +249,14 @@ void WS2812Analyzer::_buildChannelResult(int ch) {
 
     r.total_checked = _cap.frames[0].pixelCount;
 
+    // Save first pixel (GRB wire → RGB)
+    if (_cap.firstFramePixelCount > 0) {
+        r.px0_g = _cap.firstFramePixels[0];
+        r.px0_r = _cap.firstFramePixels[1];
+        r.px0_b = _cap.firstFramePixels[2];
+        r.frame_id = r.px0_r + (uint16_t)r.px0_g * 256;
+    }
+
     // Compare first frame with expected pattern
     if (_expected[ch].hasData && _cap.firstFramePixelCount > 0) {
         uint16_t cmpPixels = min(_cap.firstFramePixelCount, _expected[ch].pixelCount);
@@ -308,17 +316,19 @@ String WS2812Analyzer::getResultJson() const {
     for (int i = 0; i < CAP_NUM_CHANNELS; i++) {
         if (i > 0) json += ",";
         const CaptureResult& r = _results[i];
-        char buf[256];
+        char buf[300];
         snprintf(buf, sizeof(buf),
             "{\"ch\":%d,\"frames\":%d,"
             "\"avg_fps\":%.1f,\"min_fps\":%.1f,\"max_fps\":%.1f,"
             "\"timing_ok\":%s,\"avg_t0h_ns\":%.0f,\"avg_t1h_ns\":%.0f,"
-            "\"mismatches\":%d,\"checked\":%d,\"dropped\":%d}",
+            "\"mismatches\":%d,\"checked\":%d,\"dropped\":%d,"
+            "\"px0\":[%d,%d,%d],\"frame_id\":%d}",
             r.channel, r.frames_captured,
             r.avg_fps, r.min_fps, r.max_fps,
             r.timing_ok ? "true" : "false",
             r.avg_t0h_ns, r.avg_t1h_ns,
-            r.pixel_mismatches, r.total_checked, r.dropped_frames);
+            r.pixel_mismatches, r.total_checked, r.dropped_frames,
+            r.px0_r, r.px0_g, r.px0_b, r.frame_id);
         json += buf;
     }
     json += "]}";

@@ -26,6 +26,9 @@ struct CaptureResult {
     uint16_t pixel_mismatches;
     uint16_t total_checked;
     uint16_t dropped_frames;
+    // First frame pixel 0 (RGB, decoded from GRB wire order)
+    uint8_t  px0_r, px0_g, px0_b;
+    uint16_t frame_id;  // px0_r + px0_g * 256
 };
 
 class WS2812Analyzer {
