@@ -36,6 +36,7 @@ public:
     bool isCapturing() const { return _capturing; }
 
     void setExpected(uint8_t channel, const uint8_t* pixels, uint16_t pixelCount);
+    void clearExpected();
 
     String getResultJson() const;
 
@@ -49,6 +50,14 @@ private:
     volatile bool _capturing = false;
     uint32_t _captureDurationMs = 0;
     CaptureResult _results[CAP_NUM_CHANNELS];
+
+    // Expected pattern per channel (set via setExpected)
+    struct Expected {
+        uint8_t  pixels[MAX_PIXELS_PER_CH * 3];  // GRB bytes
+        uint16_t pixelCount;
+        bool     hasData;
+    };
+    Expected _expected[CAP_NUM_CHANNELS];
 
     uint8_t _pins[CAP_NUM_CHANNELS] = {
         CAP_CH0, CAP_CH1, CAP_CH2, CAP_CH3,

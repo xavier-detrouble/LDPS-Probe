@@ -128,6 +128,34 @@ void UartHandler::_handleTB(const char* payload) {
         int raw = analogRead(ADC_VIN_PIN);
         float voltage = (raw / 4095.0f) * 3.3f * ADC_DIVIDER_RATIO;
         Serial.printf("tb:ADC_RESULT,%.0f\n", voltage * 1000);  // mV
+    } else if (strncmp(payload, "SET_EXPECTED,", 13) == 0) {
+        // TB:SET_EXPECTED,{ch},{pixel_count},{hex_grb_data}
+        int ch = 0;
+        uint16_t pixelCount = 0;
+        const char* p = payload + 13;
+        ch = atoi(p);
+        const char* c1 = strchr(p, ',');
+        if (c1) {
+            pixelCount = atoi(c1 + 1);
+            const char* c2 = strchr(c1 + 1, ',');
+            if (c2 && pixelCount > 0 && pixelCount <= 512) {
+                c2++;
+                uint8_t pixels[512 * 3];
+                uint16_t byteCount = 0;
+                while (*c2 && byteCount < pixelCount * 3) {
+                    char hex[3] = {c2[0], c2[1], 0};
+                    pixels[byteCount++] = strtoul(hex, nullptr, 16);
+                    c2 += 2;
+                }
+                _analyzer->setExpected(ch, pixels, byteCount / 3);
+                Serial.printf("tb:SET_EXPECTED,ok,ch=%d,pixels=%d\n", ch, byteCount / 3);
+            } else {
+                Serial.println("tb:SET_EXPECTED,err,bad_format");
+            }
+        }
+    } else if (strcmp(payload, "CLEAR_EXPECTED") == 0) {
+        _analyzer->clearExpected();
+        Serial.println("tb:CLEAR_EXPECTED,ok");
     } else if (strcmp(payload, "GPIO_READ") == 0) {
         // Debug: raw read of all capture pins
         uint32_t in1 = REG_READ(GPIO_IN1_REG);

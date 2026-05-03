@@ -249,9 +249,23 @@ void WS2812Analyzer::_buildChannelResult(int ch) {
 
     r.total_checked = _cap.frames[0].pixelCount;
 
-    ESP_LOGI(TAG, "CH%d: %d frames, %.1f fps (%.1f-%.1f), T0H=%.0f T1H=%.0f, drops=%d",
-             ch, r.frames_captured, r.avg_fps, r.min_fps, r.max_fps,
-             r.avg_t0h_ns, r.avg_t1h_ns, r.dropped_frames);
+    // Compare first frame with expected pattern
+    if (_expected[ch].hasData && _cap.firstFramePixelCount > 0) {
+        uint16_t cmpPixels = min(_cap.firstFramePixelCount, _expected[ch].pixelCount);
+        uint16_t mismatches = 0;
+        for (uint16_t i = 0; i < cmpPixels * 3; i++) {
+            if (_cap.firstFramePixels[i] != _expected[ch].pixels[i]) {
+                mismatches++;
+            }
+        }
+        r.pixel_mismatches = mismatches;
+        r.total_checked = cmpPixels;
+    }
+
+    ESP_LOGI(TAG, "CH%d: %d frames, %.1f fps, T0H=%.0f T1H=%.0f, drops=%d, mismatch=%d/%d",
+             ch, r.frames_captured, r.avg_fps,
+             r.avg_t0h_ns, r.avg_t1h_ns, r.dropped_frames,
+             r.pixel_mismatches, r.total_checked);
 }
 
 // ── Main capture ────────────────────────────────────────────
@@ -273,7 +287,20 @@ void WS2812Analyzer::_doCapture(uint32_t durationMs) {
 }
 
 void WS2812Analyzer::setExpected(uint8_t channel, const uint8_t* pixels, uint16_t count) {
-    (void)channel; (void)pixels; (void)count;
+    if (channel >= CAP_NUM_CHANNELS) return;
+    uint16_t bytes = count * 3;
+    if (bytes > sizeof(_expected[channel].pixels)) bytes = sizeof(_expected[channel].pixels);
+    memcpy(_expected[channel].pixels, pixels, bytes);
+    _expected[channel].pixelCount = count;
+    _expected[channel].hasData = true;
+    ESP_LOGI(TAG, "Expected set for CH%d: %d pixels", channel, count);
+}
+
+void WS2812Analyzer::clearExpected() {
+    for (int i = 0; i < CAP_NUM_CHANNELS; i++) {
+        _expected[i].hasData = false;
+        _expected[i].pixelCount = 0;
+    }
 }
 
 String WS2812Analyzer::getResultJson() const {
