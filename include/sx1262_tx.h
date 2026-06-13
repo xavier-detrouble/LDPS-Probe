@@ -1,6 +1,6 @@
 #pragma once
 // ============================================================
-//  SX1262 TX — Send 13-byte playback frames to Node
+//  SX1262 TX — Send 14-byte v2 playback frames to Node (ADR-016)
 //  Same binary protocol as Hub (protocol.py)
 // ============================================================
 
@@ -16,7 +16,7 @@ public:
     void loop();   // Send periodic frame if playing
 
     // Commands (from UART SX: namespace)
-    void play(uint8_t seqIndex, uint8_t packId, uint8_t brightness = 100);
+    void play(uint8_t seqIndex, uint16_t packId, uint8_t brightness = 100);
     void stop();
     void seek(uint32_t progressMs);
     void setBrightness(uint8_t b);
@@ -34,7 +34,7 @@ private:
 
     bool     _playing = false;
     uint8_t  _seqIndex = 0;
-    uint8_t  _packId = 0;
+    uint16_t _packId = 0;
     uint8_t  _brightness = 100;
     uint32_t _progressMs = 0;
     uint32_t _playStartMs = 0;

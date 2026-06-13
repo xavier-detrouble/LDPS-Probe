@@ -1,5 +1,5 @@
 // ============================================================
-//  SX1262 TX — 13-byte binary playback protocol
+//  SX1262 TX — 14-byte v2 binary playback protocol (ADR-016)
 //  Same as Hub's protocol.py, implemented in C++
 // ============================================================
 
@@ -17,15 +17,50 @@ bool SX1262TX::begin() {
     Module* mod = new Module(SX_NSS, SX_DIO1, SX_RST, SX_BUSY, _spi);
     _radio = new SX1262(mod);
 
-    // Wait for BUSY to go LOW after reset
+    // Wait for BUSY to go LOW after reset (with timeout tracking)
     pinMode(SX_BUSY, INPUT);
     unsigned long t0 = millis();
-    while (digitalRead(SX_BUSY) == HIGH && millis() - t0 < 100) delay(1);
+    bool busyTimeout = false;
+    while (digitalRead(SX_BUSY) == HIGH) {
+        if (millis() - t0 > 100) { busyTimeout = true; break; }
+        delay(1);
+    }
+    Serial.printf("[SX1262] After reset: BUSY=%d (%s, %lums)\n",
+                  digitalRead(SX_BUSY), busyTimeout ? "TIMEOUT" : "OK", millis() - t0);
+
+    // Raw SPI probe: read register 0x0320 (chip identification)
+    {
+        pinMode(SX_NSS, OUTPUT);
+        digitalWrite(SX_NSS, HIGH);
+        _spi.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE0));
+        digitalWrite(SX_NSS, LOW);
+        _spi.transfer(0x1D);      // ReadRegister command
+        _spi.transfer(0x03);      // addr MSB = 0x03
+        _spi.transfer(0x20);      // addr LSB = 0x20
+        _spi.transfer(0x00);      // NOP (status)
+        uint8_t b0 = _spi.transfer(0x00);
+        uint8_t b1 = _spi.transfer(0x00);
+        uint8_t b2 = _spi.transfer(0x00);
+        uint8_t b3 = _spi.transfer(0x00);
+        digitalWrite(SX_NSS, HIGH);
+        _spi.endTransaction();
+        Serial.printf("[SX1262] SPI probe reg 0x0320: %02X %02X %02X %02X '%c%c%c%c'\n",
+                      b0, b1, b2, b3,
+                      (b0 >= 0x20 && b0 < 0x7F) ? b0 : '.',
+                      (b1 >= 0x20 && b1 < 0x7F) ? b1 : '.',
+                      (b2 >= 0x20 && b2 < 0x7F) ? b2 : '.',
+                      (b3 >= 0x20 && b3 < 0x7F) ? b3 : '.');
+        if (b0 == 0x00 && b1 == 0x00 && b2 == 0x00 && b3 == 0x00) {
+            Serial.println("[SX1262] SPI probe: all zeros — chip not responding");
+        } else if (b0 == 0xFF && b1 == 0xFF && b2 == 0xFF && b3 == 0xFF) {
+            Serial.println("[SX1262] SPI probe: all 0xFF — MISO floating");
+        }
+    }
 
     // tcxoVoltage = 0.0 → module uses XTAL, not TCXO
     int state = _radio->begin(RF_FREQ, RF_BW, RF_SF, RF_CR, RF_SYNC, RF_POWER, RF_PREAMBLE, 0.0);
     if (state != RADIOLIB_ERR_NONE) {
-        Serial.printf("[SX1262] Init failed: %d\n", state);
+        Serial.printf("[SX1262] Init failed: %d (CHIP_NOT_FOUND=-2, SPI_CMD_TIMEOUT=-4)\n", state);
         return false;
     }
 
@@ -70,7 +105,7 @@ void SX1262TX::loop() {
     _sendFrame();
 }
 
-void SX1262TX::play(uint8_t seqIndex, uint8_t packId, uint8_t brightness) {
+void SX1262TX::play(uint8_t seqIndex, uint16_t packId, uint8_t brightness) {
     _seqIndex = seqIndex;
     _packId = packId;
     _brightness = brightness;
@@ -120,8 +155,8 @@ void SX1262TX::setBrightness(uint8_t b) {
 void SX1262TX::_buildFrame(uint8_t* buf) {
     buf[0] = PROTO_MAGIC;
 
-    // flags: [7:6]=version(00), [1]=sync_mode, [0]=playing
-    uint8_t flags = 0x00;
+    // flags: [7:6]=version(01=v2), [2]=operation, [1]=sync_mode, [0]=playing
+    uint8_t flags = (uint8_t)(PROTO_VERSION << 6);
     if (_playing) flags |= 0x01;
     // HARD sync on play/seek burst, SOFT on periodic
     // For simplicity, always use HARD during burst, caller handles
@@ -143,8 +178,11 @@ void SX1262TX::_buildFrame(uint8_t* buf) {
     buf[9] = hubMs & 0xFF;
 
     buf[10] = _brightness;
-    buf[11] = _packId;
-    buf[12] = _crc8maxim(buf, 12);
+    // pack_id (uint16 BE) — v2: CRC-16/CCITT of pack_uuid, supplied by host.
+    // The node filters frames on this; the test pack's pack_id must be passed.
+    buf[11] = (uint8_t)((_packId >> 8) & 0xFF);
+    buf[12] = (uint8_t)(_packId & 0xFF);
+    buf[13] = _crc8maxim(buf, 13);
 }
 
 void SX1262TX::_sendFrame() {

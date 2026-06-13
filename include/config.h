@@ -23,13 +23,18 @@
 #define RF_BW         125.0f   // kHz
 #define RF_SF         7
 #define RF_CR         5        // 4/5
-#define RF_SYNC       0x12
+#define RF_SYNC       0x4C     // 'L' — LDPS private net (v2, ADR-016). Was 0x12
+                               // (commodity default) until the Edge-Node moved
+                               // to v2 this session; the Probe was the 3rd RF
+                               // firmware and got left on v1 → its frames were
+                               // rejected at the node PHY (RF RX test dead).
 #define RF_POWER      14       // dBm
 #define RF_PREAMBLE   8
 
-// ── SX1262 Binary Protocol ──────────────────────────────────
+// ── SX1262 Binary Protocol v2 (ADR-016) — MUST match Edge-Node ──
 #define PROTO_MAGIC       0xD5
-#define PROTO_FRAME_LEN   13
+#define PROTO_FRAME_LEN   14     // v2: +1 byte, pack_id is uint16 CRC-16/CCITT
+#define PROTO_VERSION     1      // flags[7:6] = 01 = v2
 #define PROTO_CRC8_POLY   0x31
 #define PROTO_PACK_ID_NONE 0
 
