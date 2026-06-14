@@ -1,2 +1,11 @@
 .pio/
 .vscode/
+
+# Claude Code — never commit per-user state (memory / personal rules / local settings).
+# Personal subpaths only, so team .claude/{settings.json,hooks,commands} can still be committed.
+.claude/memory/
+.claude/projects/
+.claude/rules/
+.claude/settings.local.json
+.claude/**/settings.local.json
+CLAUDE.local.md
