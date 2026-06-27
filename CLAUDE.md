@@ -3,6 +3,9 @@
 ESP32-S3 N16R8 production-test-board firmware. Integrates an ESP-NOW bridge + SX1262 TX +
 WS2812 RMT signal analyzer + I2C sniffer.
 
+> **Keep this lean — agent entry only** (target <200 lines): must-see hard rules + build/run +
+> pointers to `docs/`. Detail goes in `docs/`, not here.
+
 ## Features
 - **ESP-NOW Bridge**: forwards `EN:` commands to a Node (same protocol as the Dongle)
 - **SX1262 TX**: sends the **14-byte v2** binary playback frame (ADR-016; sync 0x4C; needs
